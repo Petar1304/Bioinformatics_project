@@ -2,6 +2,8 @@ import pandas as pd
 import os
 import io
 import hdbscan
+import numpy as np
+import matplotlib.pyplot as plt
 
 cnv_path = os.path.join(os.getcwd(), 'cnv.txt')
 vcf_path = os.path.join(os.getcwd(), 'Strelka.vcf')
@@ -48,7 +50,8 @@ def convert(val):
 
 # looping over whole dataset
 
-vafs = []
+vafs = np.array([])
+bases = np.array([])
 
 for i, row in vcf_df.iterrows():
     for j, region in filtered_regions.iterrows():
@@ -77,10 +80,8 @@ for i, row in vcf_df.iterrows():
                 alt_val = convert(get_allelic_depth_str(alt))
 
             vaf_val = vaf(ref_val, alt_val)
-
-            # vcf_df.loc[i, 'Base number'] = ref_val + alt_val
-            # vcf_df.loc[i, 'VAF'] = vaf_val
-            vafs.append(vaf_val)
+            bases = np.append(bases, ref_val + alt_val)
+            vafs = np.append(vafs, vaf_val)
 
             if vaf_val <= 0.6:
                 remove = False
@@ -88,10 +89,36 @@ for i, row in vcf_df.iterrows():
     if drop:
         vcf_df.drop(i, inplace=True)
 
-print(len(vafs))
-import hdbscan
-
-# test_data = vcf_df[['VAF', 'Base number']]
-test_data = [vafs]
+# Klasterizacija
+# train_data = np.vstack([vafs, bases])
+train_data = np.hstack([vafs.reshape(-1, 1), bases.reshape(-1, 1)])
 clusterer = hdbscan.HDBSCAN(min_cluster_size=5, gen_min_span_tree=True)
-cluster_labels = clusterer.fit(test_data)
+cluster_labels = clusterer.fit_predict(train_data)
+
+plt.figure()
+plt.grid()
+plt.title('Klasterizovani podaci')
+plt.xlabel('VAF')
+plt.ylabel('Broj baza')
+# plt.scatter((train_data[0]).T, (train_data[1]).T, c=cluster_labels, cmap='viridis', s=50, alpha=0.7)
+plt.scatter((train_data[:, 0]), (train_data[:, 1]), c=cluster_labels, cmap='viridis', s=50, alpha=0.7)
+plt.show()
+
+# Nalazenje centara klastera
+cluster_centers = np.array([])
+for cluster in np.unique(cluster_labels):
+    cluster_members = train_data[cluster_labels == cluster]
+    persistence_values = clusterer.probabilities_[clusterer.labels_ == cluster]
+    representative_point = cluster_members[np.argmax(persistence_values)]
+    cluster_centers = np.append(cluster_centers, representative_point)
+cluster_centers = cluster_centers.reshape(-1, 2)
+
+
+plt.figure()
+plt.scatter(train_data[:, 0], train_data[:, 1], c=clusterer.labels_, cmap='viridis', s=50, alpha=0.7, label='Data Points')
+plt.scatter(cluster_centers[:, 0], cluster_centers[:, 1], c='red', marker='X', s=100, label='Cluster Centers')
+plt.title('HDBSCAN Clustering Result with Cluster Centers')
+plt.xlabel('VAF (Variant Allele Frequency)')
+plt.ylabel('Bases')
+plt.legend()
+plt.show()
