@@ -1,9 +1,11 @@
 import pandas as pd
 import os
 import io
-import hdbscan
+# import hdbscan
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.cluster import HDBSCAN
+
 
 cnv_path = os.path.join(os.getcwd(), 'cnv.txt')
 vcf_path = os.path.join(os.getcwd(), 'Strelka.vcf')
@@ -92,7 +94,8 @@ for i, row in vcf_df.iterrows():
 # Klasterizacija
 # train_data = np.vstack([vafs, bases])
 train_data = np.hstack([vafs.reshape(-1, 1), bases.reshape(-1, 1)])
-clusterer = hdbscan.HDBSCAN(min_cluster_size=5, gen_min_span_tree=True)
+# clusterer = hdbscan.HDBSCAN(min_cluster_size=5, gen_min_span_tree=True)
+clusterer = HDBSCAN(min_cluster_size=5)
 cluster_labels = clusterer.fit_predict(train_data)
 
 plt.figure()
